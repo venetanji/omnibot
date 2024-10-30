@@ -1,0 +1,61 @@
+x-gpu: &x-gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            capabilities: ["gpu"]
+
+services:
+  omnibot:
+    build: .
+    volumes:
+      - ./omnibot/:/app
+    depends_on:
+      - ollama
+    command: streamlit run app.py
+    ports:
+      - 8501:8501
+
+  whisper:
+    <<: *x-gpu
+    image: fedirz/faster-whisper-server:latest-cuda
+    ports:
+      - 8000:8000
+    environment:
+      MAX_INACTIVITY_SECONDS: 1
+      INACTIVITY_WINDOW_SECONDS: 2
+      MAX_NO_DATA_SECONDS: 5
+    volumes:
+      - hugging_face_cache:/root/.cache/huggingface
+  
+  audiocraft:
+    <<: *x-gpu
+    image: audiocraft-server-dev:latest
+
+  xtts:
+    <<: *x-gpu
+    image: ghcr.io/coqui-ai/xtts-streaming-server:latest-cuda121
+    environment:
+      - COQUI_TOS_AGREED=1
+    volumes: 
+      - xtts:/root/.local/share/tts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 5s
+  
+  ollama:
+    <<: *x-gpu 
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - 11434:11434
+  
+volumes:
+  xtts:
+  hugging_face_cache:
+  ollama:
